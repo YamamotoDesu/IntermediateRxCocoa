@@ -195,6 +195,5 @@ ViewController
 
 ![image](https://user-images.githubusercontent.com/47273077/190885363-eab46c25-3e0b-4d55-8747-e9926bc6c16d.png)
 
+<img width="300" alt="スクリーンショット 2022-09-18 13 13 19" src="https://user-images.githubusercontent.com/47273077/190885416-1c5a6935-7634-41c4-a4ea-548817598b04.gif">
 
-
-          
