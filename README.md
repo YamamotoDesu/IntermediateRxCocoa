@@ -119,7 +119,82 @@ ViewController
           .disposed(by: bag)
 ```
 
-
-
 ![image](https://user-images.githubusercontent.com/47273077/190884928-e788d36f-ebbd-4709-bb36-3c17bd7b4693.png)
 
+
+------------
+
+## Updating the weather with the current data
+
+CLLocationManager+Rx
+```swift
+public extension Reactive where Base: CLLocationManager {
+
+    var authorizationStatus: Observable<CLAuthorizationStatus> {
+      delegate.methodInvoked(#selector(CLLocationManagerDelegate.locationManager(_:didChangeAuthorization:)))
+        .map { parameters in
+          CLAuthorizationStatus(rawValue: parameters[1] as! Int32)!
+        }
+        .startWith(CLLocationManager.authorizationStatus())
+    }
+    
+    func getCurrentLocation() -> Observable<CLLocation> {
+        let location = authorizationStatus
+            .filter { $0 == .authorizedWhenInUse || $0 == .authorizedAlways } // 1
+            .flatMap { _ in self.didUpdateLocations.compactMap(\.first) } // 2
+            .take(1) // 3
+            .do(onDispose: { [weak base] in base?.stopUpdatingLocation() })
+        
+        base.requestWhenInUseAuthorization()
+        base.startUpdatingLocation()
+        
+        return location // 4
+    }
+```
+
+ViewController
+```swift
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+          let searchInput = searchCityName.rx
+            .controlEvent(.editingDidEndOnExit)
+            .map { self.searchCityName.text ?? "" }
+            .filter { !$0.isEmpty }
+        
+        
+        
+          let geoSearch = geoLocationButton.rx.tap
+          .flatMapLatest { _ in self.locationManager.rx.getCurrentLocation() }
+          .flatMapLatest { location in
+            ApiController.shared
+              .currentWeather(at: location.coordinate)
+              .catchErrorJustReturn(.dummy)
+          }
+        
+        let textSearch = searchInput.flatMap { city in
+          ApiController.shared
+            .currentWeather(for: city)
+            .catchErrorJustReturn(.dummy)
+        }
+        
+        let search = Observable
+          .merge(geoSearch, textSearch)
+          .asDriver(onErrorJustReturn: .dummy)
+          
+                  let running = Observable.merge(
+          searchInput.map { _ in true },
+          geoLocationButton.rx.tap.map { _ in true },
+          search.map { _ in false }.asObservable()
+        )
+        .startWith(true)
+        .asDriver(onErrorJustReturn: false)
+```
+
+![image](https://user-images.githubusercontent.com/47273077/190885360-85eed7e8-4c34-448d-b3a0-71c89640b026.png)
+
+![image](https://user-images.githubusercontent.com/47273077/190885363-eab46c25-3e0b-4d55-8747-e9926bc6c16d.png)
+
+
+
+          
