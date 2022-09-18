@@ -56,3 +56,70 @@
 ![image](https://user-images.githubusercontent.com/47273077/190880653-d15266d9-500d-46d4-80dd-de55ed8e5ea3.png)
   
 <img width="300" src="https://user-images.githubusercontent.com/47273077/190880772-a1915f9d-976c-416b-8b02-a848d824ad91.gif">
+
+-------
+
+## Extending CLLocationManager to get the current position
+
+CLLocationManager+Rx
+```swift
+import Foundation
+import CoreLocation
+import RxSwift
+import RxCocoa
+
+extension CLLocationManager: HasDelegate {}
+
+class RxCLLocationManagerDelegateProxy: DelegateProxy<CLLocationManager, CLLocationManagerDelegate>, DelegateProxyType, CLLocationManagerDelegate {
+    weak public private(set) var locationManager: CLLocationManager?
+    
+    public init(locationManager: ParentObject) {
+        self.locationManager = locationManager
+        super.init(parentObject: locationManager,
+                   delegateProxy: RxCLLocationManagerDelegateProxy.self)
+    }
+    
+    static func registerKnownImplementations() {
+        register { RxCLLocationManagerDelegateProxy(locationManager: $0) }
+    }
+}
+
+public extension Reactive where Base: CLLocationManager {
+    var delegate: DelegateProxy<CLLocationManager, CLLocationManagerDelegate> {
+        RxCLLocationManagerDelegateProxy.proxy(for: base)
+    }
+    
+    var didUpdateLocations: Observable<[CLLocation]> {
+      delegate.methodInvoked(#selector(CLLocationManagerDelegate.locationManager(_:didUpdateLocations:)))
+        .map { parameters in
+          parameters[1] as! [CLLocation]
+        }
+    }
+}
+```
+
+ViewController
+```swift
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+                geoLocationButton.rx.tap
+          .subscribe(onNext: { [weak self] _ in
+            guard let self = self else { return }
+
+            self.locationManager.requestWhenInUseAuthorization()
+            self.locationManager.startUpdatingLocation()
+          })
+          .disposed(by: bag)
+        
+        locationManager.rx.didUpdateLocations
+          .subscribe(onNext: { locations in
+            print(locations)
+          })
+          .disposed(by: bag)
+```
+
+
+
+![image](https://user-images.githubusercontent.com/47273077/190884928-e788d36f-ebbd-4709-bb36-3c17bd7b4693.png)
+
